@@ -1,0 +1,46 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_HUB_REPO = "veeradockerhub/java-hotstar"
+        IMAGE_TAG = "latest"
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'master', url: 'https://github.com/veeraprasadkoduri-cmd/java-project-maven.git'
+            }
+        }
+
+        stage('Build Maven') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t $DOCKER_HUB_REPO:$IMAGE_TAG ."
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-creds', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                    sh "docker push $DOCKER_HUB_REPO:$IMAGE_TAG"
+                }
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh "docker rm -f java-hotstar || true"
+                sh "docker run -d -p 92:8080 --name java-hotstar $DOCKER_HUB_REPO:$IMAGE_TAG"
+            }
+        }
+
+    }
+}
